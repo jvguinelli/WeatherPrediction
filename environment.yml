@@ -1,0 +1,12 @@
+name: pytorch
+channels:
+  - defaults
+dependencies:
+  - pytorch==1.7.0
+  - torchaudio==0.7.0
+  - cudatoolkit=10.1
+  - torchvision==0.8.0
+  - xarray
+  - jupyter
+  - ipykernel
+  - configargparse
