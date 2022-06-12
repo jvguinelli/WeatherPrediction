@@ -122,7 +122,7 @@ class WeatherBenchDataset(Dataset):
         
     def __getitem__(self, index):
         
-        if self.load_part_size: 
+        if self.load_part_size > 0: 
             loaded_end_idx = self.loaded_init_idx + self.load_part_size
             if index < self.loaded_init_idx or index >= loaded_end_idx:
                 self.loaded_data = self.data

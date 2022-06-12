@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from src.dataset import WeatherBenchDataset
 from src.attention_models import WeatherPred
-from src.loss import WeightedRMSELoss
+from src.loss import WeightedMSELoss
 from src.train import Trainer, EarlyStopping
 from src.evaluate import Evaluator
 from src.utils import Utils, load_test_data, create_predictions, compute_weighted_rmse
@@ -127,7 +127,7 @@ def run(config):
     model = model.to(config.device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-    loss_fn = WeightedRMSELoss(ds.lat, config.device)
+    loss_fn = WeightedMSELoss(ds.lat, config.device)
     evaluator = Evaluator(model, val_loader, loss_fn, config.device)
     
     util = Utils('./output', model_name)

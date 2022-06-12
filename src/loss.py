@@ -24,3 +24,15 @@ class WeightedRMSELoss(nn.Module):
         error = y_hat - y
         mse = torch.mean(error**2 * self.weights[None, None, :, None])
         return torch.sqrt(mse + self.eps)
+    
+class WeightedMSELoss(nn.Module):
+    def __init__(self, lat, device):
+        super().__init__()
+        self.weights = np.cos(np.deg2rad(lat)).values
+        self.weights /= self.weights.mean()
+        self.weights = torch.from_numpy(self.weights).to(device)
+        
+    def forward(self, y_hat, y):
+        error = y_hat - y
+        mse = torch.mean(error**2 * self.weights[None, None, :, None])
+        return mse
