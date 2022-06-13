@@ -37,12 +37,13 @@ def get_arguments(my_config=None):
     parser.add_argument('--dim_key', type=int, default=32) 
     parser.add_argument('--rel_pos_length', type=int, default=3) 
     
-    parser.add_argument('--network_type', type=str, default='resnet', help='Type')
+    parser.add_argument('--network_type', type=str, default='gsa-net', help='Type')
     
     
     parser.add_argument('--train_years', type=str, nargs='+', default=('1979', '2015'), help='Start/stop years for training')
     parser.add_argument('--valid_years', type=str, nargs='+', default=('2016', '2016'), help='Start/stop years for validation')
     parser.add_argument('--test_years', type=str, nargs='+', default=('2017', '2018'), help='Start/stop years for testing')
+    parser.add_argument('--shuffle_train', action='store_true', help='Indicate if training data should be shuffled')
     
     parser.add_argument('--data_subsample', type=int, default=1, help='Subsampling for training data')
     parser.add_argument('--norm_subsample', type=int, default=1, help='Subsampling for mean/std')
@@ -115,7 +116,7 @@ def run(config):
               'num_workers': config.workers, 
               'worker_init_fn': init_seed}
     
-    train_loader = DataLoader(dataset=ds_train, shuffle=False, **params)
+    train_loader = DataLoader(dataset=ds_train, shuffle=config.shuffle_train, **params)
     val_loader = DataLoader(dataset=ds_val, shuffle=False, **params)
     
     in_channels = ds_train[0][0].shape[0]
