@@ -155,7 +155,7 @@ def run(config):
     
     preds = create_predictions(model, test_loader, device=config.device)
     
-    z500_valid = load_test_data(f'{data_dir}geopotential', 'z', years=slice(*config.test_years))
+    z500_valid = load_test_data(f'{config.data_dir}geopotential', 'z', years=slice(*config.test_years))
     
     test_loss = compute_weighted_rmse(preds, z500_valid).load()
         
