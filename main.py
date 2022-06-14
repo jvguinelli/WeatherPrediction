@@ -122,6 +122,9 @@ def run(config):
     in_channels = ds_train[0][0].shape[0]
     out_channels = ds_train[0][1].shape[0]
     
+    print('Train X shape:', ds_train[0][0].shape, 'Train Y shape:', ds_train[0][1].shape)
+    print('Valid X shape:', ds_val[0][0].shape, 'Valid Y shape:', ds_val[0][1].shape)
+    
     model = WeatherPred(in_channels=in_channels, hidden_dim=config.hidden_dim, out_channels=out_channels, 
                         num_layers=config.num_layers, heads=config.heads, dim_key=config.dim_key, rel_pos_length=config.rel_pos_length)
     model_name = model.__class__.__name__
