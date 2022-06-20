@@ -130,7 +130,7 @@ def run(config):
     model_name = model.__class__.__name__
     model = model.to(config.device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=1e-5)
     loss_fn = WeightedMSELoss(ds.lat, config.device)
     evaluator = Evaluator(model, val_loader, loss_fn, config.device)
     
