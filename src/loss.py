@@ -36,3 +36,15 @@ class WeightedMSELoss(nn.Module):
         error = y_hat - y
         mse = torch.mean(error**2 * self.weights[None, None, :, None])
         return mse
+
+class WeightedMAELoss(nn.Module):
+    def __init__(self, lat, device):
+        super().__init__()
+        self.weights = np.cos(np.deg2rad(lat)).values
+        self.weights /= self.weights.mean()
+        self.weights = torch.from_numpy(self.weights).to(device)
+        
+    def forward(self, y_hat, y):
+        error = y_hat - y
+        mse = torch.mean(torch.abs(error) * self.weights[None, None, :, None])
+        return mse
