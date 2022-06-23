@@ -35,6 +35,13 @@ class WeatherPred(nn.Module):
             nn.ZeroPad2d((0, 0, 1, 1)),
             nn.Conv2d(in_channels=hidden_dim, out_channels=out_channels, kernel_size=3, padding=(0, 1), padding_mode='circular')
         )
+        
+        for module in self.modules():
+            if isinstance(module, torch.nn.modules.BatchNorm2d):
+                module.track_running_stats = False
+                module.running_mean = None
+                module.running_var = None
+        
 
     def forward(self, x):
         x = self.init_conv(x)
