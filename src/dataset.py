@@ -9,8 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 
 class WeatherBenchDataset(Dataset):
     
-    def __init__(self, dataset, var_dict, lead_time, output_vars, nt_in=3, dt_in=6, time_dim=True, mean=None, std=None, 
-                 normalize=True, cont_time=True, fixed_time=True, multi_dt=1, discard_first=None,
+    def __init__(self, dataset, var_dict, lead_time, output_vars, nt_in=3, dt_in=6, time_dim=True, transpose_time_dim=False,
+                 mean=None, std=None, normalize=True, cont_time=True, fixed_time=True, multi_dt=1, discard_first=None,
                  data_subsample=1, norm_subsample=1, tp_log=None, load=True, load_part_size=0, verbose=1):
         '''
         - nt_in: number of input time steps
@@ -27,6 +27,7 @@ class WeatherBenchDataset(Dataset):
         self.fixed_time = fixed_time
         self.multi_dt = multi_dt
         self.time_dim = time_dim
+        self.transpose_time_dim = transpose_time_dim
         self.load_part_size = load_part_size
         
         data = []
@@ -192,11 +193,17 @@ class WeatherBenchDataset(Dataset):
                             # a ser previsto ao canal
             if not self.time_dim:
                 X = np.concatenate([X, ftime[..., None]], axis=-1).astype('float32')
-                X = np.transpose(X, (2, 0, 1))
             else:
                 ftime = np.array([ftime] * self.nt_in).astype('float32')
                 X = np.concatenate([X, ftime[..., None]], axis=-1).astype('float32')
+                
+        if self.time_dim:
+            if self.transpose_time_dim:
+                X = np.transpose(X, (3, 0, 1, 2))
+            else:
                 X = np.transpose(X, (0, 3, 1, 2))
+        else:
+            X = np.transpose(X, (2, 0, 1))
                 
         
         y = np.transpose(y, (2, 0, 1))

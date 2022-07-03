@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.dataset import WeatherBenchDataset
-from src.attention_models import BasicGSA, ConvLSTMGSA
+from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA
 from src.loss import WeightedMAELoss, WeightedMSELoss, WeightedRMSELoss
 from src.train import Trainer, EarlyStopping
 from src.evaluate import Evaluator
@@ -39,7 +39,6 @@ def get_arguments(my_config=None):
     
     parser.add_argument('--model_name', type=str, default='BasicGSA', help='Type')
     
-    
     parser.add_argument('--train_years', type=str, nargs='+', default=('1979', '2015'), help='Start/stop years for training')
     parser.add_argument('--valid_years', type=str, nargs='+', default=('2016', '2016'), help='Start/stop years for validation')
     parser.add_argument('--test_years', type=str, nargs='+', default=('2017', '2018'), help='Start/stop years for testing')
@@ -57,7 +56,7 @@ def get_arguments(my_config=None):
     parser.add_argument('--in_vars', required=True, help='Variables: as an ugly dictionary...')
     parser.add_argument('--out_vars', nargs='+', help='Output variables. Format {var}_{level}', default=None)
     
-    parser.add_argument('--time_dim', action='store_true')
+    #parser.add_argument('--time_dim', action='store_true')
     
     parser.add_argument('--ext_mean', type=str, default='./mean.nc', help='External normalization mean')
     parser.add_argument('--ext_std', type=str, default='./std.nc', help='External normalization std')
@@ -88,6 +87,7 @@ def init_seed(number):
 def get_model(model_name):
     models = {
         'BasicGSA': BasicGSA,
+        'ConvGSA': ConvGSA,
         'ConvLSTMGSA': ConvLSTMGSA
     }
     return models[model_name]
@@ -110,16 +110,20 @@ def run(config):
     ds_mean = xr.open_dataarray(config.ext_mean)
     ds_std = xr.open_dataarray(config.ext_std)
     
+    # options specific to dataset generation
+    time_dim = True if config.model_name not in ['BasicGSA'] else False
+    transpose_time_dim = True if config.model_name in ['ConvGSA'] else False
+    
     ds_train = WeatherBenchDataset(train_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                   nt_in=config.nt_in, time_dim=config.time_dim, dt_in=config.dt_in, mean=ds_mean, 
-                                   std=ds_std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
+                                   nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
+                                   mean=ds_mean, std=ds_std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
                                    discard_first=config.discard_first, data_subsample=config.data_subsample,
                                    norm_subsample=config.norm_subsample, tp_log = None, load=True, 
                                    load_part_size=config.load_part_size, verbose=config.verbose)
 
     ds_val = WeatherBenchDataset(val_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                 nt_in=config.nt_in, time_dim=config.time_dim, dt_in=config.dt_in, mean=ds_train.mean, 
-                                 std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
+                                 nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
+                                 mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
                                  data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
                                  tp_log=None, load=True, verbose=config.verbose)
     
@@ -130,7 +134,7 @@ def run(config):
     train_loader = DataLoader(dataset=ds_train, shuffle=config.shuffle_train, **params)
     val_loader = DataLoader(dataset=ds_val, shuffle=False, **params)
     
-    if not config.time_dim:
+    if (not time_dim) or (transpose_time_dim):
         in_channels = ds_train[0][0].shape[0]
     else:
         in_channels = ds_train[0][0].shape[1]
@@ -168,8 +172,8 @@ def run(config):
     del(val_loader)
     
     ds_test = WeatherBenchDataset(test_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                  nt_in=config.nt_in, time_dim=config.time_dim, dt_in=config.dt_in, mean=ds_train.mean, 
-                                  std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt, 
+                                  nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
+                                  mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt, 
                                   data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
                                   tp_log=None, load=True, verbose=config.verbose)
     
