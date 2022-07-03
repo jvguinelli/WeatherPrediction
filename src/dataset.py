@@ -6,9 +6,10 @@ import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
 
+
 class WeatherBenchDataset(Dataset):
     
-    def __init__(self, dataset, var_dict, lead_time, output_vars, nt_in=3, dt_in=6, mean=None, std=None, 
+    def __init__(self, dataset, var_dict, lead_time, output_vars, nt_in=3, dt_in=6, time_dim=True, mean=None, std=None, 
                  normalize=True, cont_time=True, fixed_time=True, multi_dt=1, discard_first=None,
                  data_subsample=1, norm_subsample=1, tp_log=None, load=True, load_part_size=0, verbose=1):
         '''
@@ -25,6 +26,7 @@ class WeatherBenchDataset(Dataset):
         self.cont_time = cont_time
         self.fixed_time = fixed_time
         self.multi_dt = multi_dt
+        self.time_dim = time_dim
         self.load_part_size = load_part_size
         
         data = []
@@ -159,15 +161,22 @@ class WeatherBenchDataset(Dataset):
 
         X = X_data.isel(time=index).values.astype('float32')
         
-        # seria quando considera mais de um time step como entrada ou como predicao??
+        # seria quando considera mais de um time step como entrada ou como predicao?? como predicao
         if self.multi_dt > 1: consts = X[..., self.const_idxs]
 
         if self.nt_in > 1:
-            X = np.concatenate([
-                                   # remove consts to avoid repitition, they are already presente in X
-                                   X_data.isel(time=index - nt_in * self.dt_in).values[..., self.not_const_idxs]
-                                   for nt_in in range(self.nt_in - 1, 0, -1)
-                               ] + [X], axis=-1).astype('float32')
+            if not self.time_dim:
+                X = np.concatenate([
+                                       # remove consts to avoid repitition, they are already presente in X
+                                       X_data.isel(time=index - nt_in * self.dt_in).values[..., self.not_const_idxs]
+                                       for nt_in in range(self.nt_in - 1, 0, -1)
+                                   ] + [X], axis=-1).astype('float32')
+            else:
+                X = np.stack([
+                                # remove consts to avoid repitition, they are already presente in X
+                                X_data.isel(time=index - nt_in * self.dt_in).values
+                                for nt_in in range(self.nt_in - 1, 0, -1)
+                             ] + [X], axis=0).astype('float32')
 
         if self.multi_dt > 1:
             X = [X[..., self.not_const_idxs], consts]
@@ -181,9 +190,15 @@ class WeatherBenchDataset(Dataset):
 
         if self.cont_time:  # no caso de predicao continua, adiciona a variavel referente ao time step 
                             # a ser previsto ao canal
-            X = np.concatenate([X, ftime[..., None]], -1).astype('float32')
+            if not self.time_dim:
+                X = np.concatenate([X, ftime[..., None]], axis=-1).astype('float32')
+                X = np.transpose(X, (2, 0, 1))
+            else:
+                ftime = np.array([ftime] * self.nt_in).astype('float32')
+                X = np.concatenate([X, ftime[..., None]], axis=-1).astype('float32')
+                X = np.transpose(X, (0, 3, 1, 2))
+                
         
-        X = np.transpose(X, (2, 0, 1))
         y = np.transpose(y, (2, 0, 1))
         return X, y
         
