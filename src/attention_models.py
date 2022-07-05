@@ -3,6 +3,7 @@ from torch import nn
 
 from positional_encodings import PositionalEncodingPermute2D, Summer, PositionalEncoding2D
 from gsa_pytorch import GSA
+from axial_attention import AxialAttention, AxialPositionalEmbedding
 
 from .convlstm import ConvLSTM
 
@@ -122,6 +123,50 @@ class ConvLSTMGSA(nn.Module):
                                               rel_pos_length=rel_pos_length
                                              ),
                                           nn.BatchNorm2d(hidden_dim)
+                                         )
+            )
+        
+        self.end_conv = nn.Sequential(
+            nn.ZeroPad2d((0, 0, 1, 1)),
+            nn.Conv2d(in_channels=hidden_dim, out_channels=out_channels, kernel_size=3, padding=(0, 1), padding_mode='circular')
+        )
+        
+        for module in self.modules():
+            if isinstance(module, torch.nn.modules.BatchNorm2d):
+                module.momentum = 0.2
+
+    def forward(self, x):
+        _, lst_states = self.init_convlstm(x)
+        x = lst_states[0][0]
+        x = self.positional_encoding(x)
+        x = self.attention(x)
+        x = self.end_conv(x)
+        return x
+    
+    
+class ConvLSTMAxial(nn.Module):
+    def __init__(self, in_channels, hidden_dim=128, out_channels=1, num_layers=5, heads=8, dim_key=32, rel_pos_length=3):
+        super().__init__()
+        
+        self.init_convlstm = ConvLSTM(input_dim=in_channels, 
+                                      hidden_dim=128, 
+                                      kernel_size=(3, 3),
+                                      num_layers=1,
+                                      batch_first=True
+                                     )
+        
+        self.positional_encoding = AxialPositionalEmbedding(dim=hidden_dim, shape=(32, 64))
+        
+        self.attention = nn.Sequential()
+        
+        for i in range(num_layers):
+            self.attention.add_module(
+                f'GSA_{i}', nn.Sequential(AxialAttention(dim = hidden_dim, 
+                                                         dim_index=1,
+                                                         dim_heads=dim_key,
+                                                         heads=heads,
+                                                         num_dimensions=2, 
+                                                        )
                                          )
             )
         

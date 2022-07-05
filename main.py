@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.dataset import WeatherBenchDataset
-from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA
+from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA, ConvLSTMAxial
 from src.loss import WeightedMAELoss, WeightedMSELoss, WeightedRMSELoss
 from src.train import Trainer, EarlyStopping
 from src.evaluate import Evaluator
@@ -88,7 +88,8 @@ def get_model(model_name):
     models = {
         'BasicGSA': BasicGSA,
         'ConvGSA': ConvGSA,
-        'ConvLSTMGSA': ConvLSTMGSA
+        'ConvLSTMGSA': ConvLSTMGSA,
+        'ConvLSTMAxial': ConvLSTMAxial
     }
     return models[model_name]
 
