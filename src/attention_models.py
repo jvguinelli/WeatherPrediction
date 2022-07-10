@@ -1,9 +1,9 @@
 import torch
 from torch import nn
 
-from positional_encodings import PositionalEncodingPermute2D, Summer, PositionalEncoding2D
+from positional_encodings import PositionalEncodingPermute2D, Summer
 from gsa_pytorch import GSA
-from axial_attention import AxialAttention, AxialPositionalEmbedding
+from axial_attention import AxialAttention
 
 from .convlstm import ConvLSTM
 
@@ -105,7 +105,7 @@ class ConvLSTMGSA(nn.Module):
         
         self.init_convlstm = ConvLSTM(input_dim=in_channels, 
                                       hidden_dim=128, 
-                                      kernel_size=(3, 3),
+                                      kernel_size=(1, 1),
                                       num_layers=1,
                                       batch_first=True
                                      )
@@ -150,12 +150,12 @@ class ConvLSTMAxial(nn.Module):
         
         self.init_convlstm = ConvLSTM(input_dim=in_channels, 
                                       hidden_dim=128, 
-                                      kernel_size=(3, 3),
+                                      kernel_size=(1, 1),
                                       num_layers=1,
                                       batch_first=True
                                      )
         
-        self.positional_encoding = AxialPositionalEmbedding(dim=hidden_dim, shape=(32, 64))
+        self.positional_encoding = Summer(PositionalEncodingPermute2D(hidden_dim))
         
         self.attention = nn.Sequential()
         
@@ -182,7 +182,7 @@ class ConvLSTMAxial(nn.Module):
     def forward(self, x):
         _, lst_states = self.init_convlstm(x)
         x = lst_states[0][0]
-        x = self.positional_encoding(x)
+        x = self.positional_encoding(x) + x
         x = self.attention(x)
         x = self.end_conv(x)
         return x
