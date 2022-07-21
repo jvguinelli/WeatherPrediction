@@ -1,9 +1,10 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
-from positional_encodings import PositionalEncodingPermute2D, Summer
+from positional_encodings import PositionalEncodingPermute2D, Summer, PositionalEncoding2D
 from gsa_pytorch import GSA
-from axial_attention import AxialAttention
+from axial_attention import AxialAttention, AxialPositionalEmbedding
 
 from .convlstm import ConvLSTM
 
@@ -59,7 +60,9 @@ class ConvGSA(nn.Module):
         super().__init__()
         
         self.init_conv = nn.Sequential(
-            nn.Conv3d(in_channels=in_channels, out_channels=hidden_dim, kernel_size=(3, 1, 1)),
+            CircularPad3d([1, 1, 0, 0, 0, 0]),
+            nn.ConstantPad3d([0, 0, 1, 1, 0, 0], 0),
+            nn.Conv3d(in_channels=in_channels, out_channels=hidden_dim, kernel_size=(3, 3, 3)),
             nn.BatchNorm3d(hidden_dim),
             nn.LeakyReLU()
         )
@@ -110,6 +113,9 @@ class ConvLSTMGSA(nn.Module):
                                       batch_first=True
                                      )
         
+        
+        self.dropout = nn.Dropout(0.3)
+        
         self.positional_encoding = Summer(PositionalEncodingPermute2D(hidden_dim))
         
         self.attention = nn.Sequential()
@@ -138,6 +144,7 @@ class ConvLSTMGSA(nn.Module):
     def forward(self, x):
         _, lst_states = self.init_convlstm(x)
         x = lst_states[0][0]
+        x = self.dropout(x)
         x = self.positional_encoding(x)
         x = self.attention(x)
         x = self.end_conv(x)
@@ -150,12 +157,12 @@ class ConvLSTMAxial(nn.Module):
         
         self.init_convlstm = ConvLSTM(input_dim=in_channels, 
                                       hidden_dim=128, 
-                                      kernel_size=(1, 1),
+                                      kernel_size=(3, 3),
                                       num_layers=1,
                                       batch_first=True
                                      )
         
-        self.positional_encoding = Summer(PositionalEncodingPermute2D(hidden_dim))
+        self.positional_encoding = AxialPositionalEmbedding(dim=hidden_dim, shape=(32, 64))
         
         self.attention = nn.Sequential()
         
@@ -182,7 +189,19 @@ class ConvLSTMAxial(nn.Module):
     def forward(self, x):
         _, lst_states = self.init_convlstm(x)
         x = lst_states[0][0]
-        x = self.positional_encoding(x) + x
+        x = self.positional_encoding(x)
         x = self.attention(x)
         x = self.end_conv(x)
         return x
+    
+    
+class CircularPad3d(nn.Module):
+    def __init__(self, padding):
+        super(CircularPad3d, self).__init__()
+        self.padding = padding
+    
+    def forward(self, input):
+        return F.pad(input, self.padding, 'circular')
+
+    def extra_repr(self):
+        return '{}'.format(self.padding)
