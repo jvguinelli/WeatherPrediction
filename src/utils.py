@@ -65,8 +65,8 @@ def create_predictions(model, data_loader, multi_dt=False, no_mean=False, device
     level_names = data_loader.dataset.data.isel(level=data_loader.dataset.output_idxs).level_names
     level = data_loader.dataset.data.isel(level=data_loader.dataset.output_idxs).level
 
-    mean = data_loader.dataset.mean.isel(level=data_loader.dataset.output_idxs).values if not no_mean else 0
-    std = data_loader.dataset.std.isel(level=data_loader.dataset.output_idxs).values
+    mean = data_loader.dataset.mean.isel(level=data_loader.dataset.output_idxs).values[None, :, None, None] if not no_mean else 0
+    std = data_loader.dataset.std.isel(level=data_loader.dataset.output_idxs).values[None, :, None, None]
 
     # my implementation
 

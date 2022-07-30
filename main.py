@@ -10,10 +10,12 @@ import xarray as xr
 import numpy as np
 
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 
 from src.dataset import WeatherBenchDataset
 from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA, ConvLSTMAxial
+from src.resnet_models import BasicResNet
 from src.loss import WeightedMAELoss, WeightedMSELoss, WeightedRMSELoss
 from src.train import Trainer, EarlyStopping
 from src.evaluate import Evaluator
@@ -26,14 +28,16 @@ def get_arguments(my_config=None):
     parser.add_argument('-b', '--batch', type=int, default=16)
     parser.add_argument('-p', '--patience', type=int, default=5)
     parser.add_argument('-w', '--workers', type=int, default=0)
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=5e-4, help='Learning rate')
     parser.add_argument('--val_check_interval', type=int, default=800)
     
     parser.add_argument('-l', '--num_layers', type=int, default=8)
     parser.add_argument('-d', '--hidden_dim', type=int, default=128)
     parser.add_argument('-k', '--kernels', type=int, nargs='+', default=None, help='Kernel size for each layer')
+    parser.add_argument('--filters', type=int, nargs='+', help='Filters for each layer')
+    parser.add_argument('--bn_position', type=str, default=None, help='pre, mid or post')
+    parser.add_argument('--dropout', type=float, default=0, help='Dropout')
     parser.add_argument('--heads', type=int, default=8)
-    #parser.add_argument('--filters', type=int, nargs='+', required=True, help='Filters for each layer')
     parser.add_argument('--dim_key', type=int, default=32) 
     parser.add_argument('--rel_pos_length', type=int, default=3) 
     
@@ -89,7 +93,8 @@ def get_model(model_name):
         'BasicGSA': BasicGSA,
         'ConvGSA': ConvGSA,
         'ConvLSTMGSA': ConvLSTMGSA,
-        'ConvLSTMAxial': ConvLSTMAxial
+        'ConvLSTMAxial': ConvLSTMAxial,
+        'BasicResNet': BasicResNet
     }
     return models[model_name]
 
@@ -112,7 +117,7 @@ def run(config):
     ds_std = xr.open_dataarray(config.ext_std)
     
     # options specific to dataset generation
-    time_dim = True if config.model_name not in ['BasicGSA'] else False
+    time_dim = True if config.model_name not in ['BasicGSA', 'BasicResNet'] else False
     transpose_time_dim = True if config.model_name in ['ConvGSA'] else False
     
     ds_train = WeatherBenchDataset(train_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
@@ -147,8 +152,13 @@ def run(config):
     
     model = get_model(config.model_name)
     
-    model = model(in_channels=in_channels, hidden_dim=config.hidden_dim, out_channels=out_channels, 
-                  num_layers=config.num_layers, heads=config.heads, dim_key=config.dim_key, rel_pos_length=config.rel_pos_length)
+    if config.model_name == 'BasicResNet':
+        model = model(in_channels=in_channels, filters=config.filters, kernels=config.kernels, bn_position=config.bn_position, 
+                      skip=True, bias=True, dropout=config.dropout, activation=nn.LeakyReLU)
+    else:
+        model = model(in_channels=in_channels, hidden_dim=config.hidden_dim, out_channels=out_channels, num_layers=config.num_layers,
+                      heads=config.heads, dim_key=config.dim_key, rel_pos_length=config.rel_pos_length)
+        
     model_name = model.__class__.__name__
     model = model.to(config.device)
     
