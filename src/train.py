@@ -2,13 +2,15 @@ import torch
 
 class Trainer:
     
-    def __init__(self, model, train_loader, optimizer, loss_fn, early_stopping, evaluator, util, device, verbose=False):
+    def __init__(self, model, train_loader, optimizer, loss_fn, early_stopping, evaluator, lr_scheduler, 
+                 util, device, verbose=False):
         self.model = model
         self.train_loader = train_loader
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.early_stopping = early_stopping
         self.evaluator = evaluator
+        self.lr_scheduler = lr_scheduler
         self.util = util
         self.device = device
         self.verbose = verbose
@@ -27,10 +29,18 @@ class Trainer:
             train_losses.append(train_loss)
             val_losses.append(val_loss)
             
+            if self.lr_scheduler:
+                self.lr_scheduler.step(val_loss)
+            
             self.early_stopping(val_loss, self.model, self.optimizer, epoch)
 
             if (torch.cuda.is_available()):
                 torch.cuda.empty_cache()
+            
+            if self.early_stopping.isToStop:
+                if (self.verbose):
+                    print("=> Stopped")
+                break
 
         return train_losses, val_losses
         
@@ -60,6 +70,11 @@ class Trainer:
                     
                     self.early_stopping(val_loss, self.model, self.optimizer, epoch)
                     self.model.train()
+                    
+                    if self.early_stopping.isToStop:
+                        if (self.verbose):
+                            print("=> Stopped")
+                        break
                     cumulative_loss = 0.0
 
         return epoch_loss/len(self.train_loader)

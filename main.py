@@ -24,11 +24,11 @@ from src.utils import Utils, load_test_data, create_predictions, compute_weighte
 def get_arguments(my_config=None):
     parser = arg.ArgParser()
     parser.add_argument('-c', '--my-config', is_config_file=True, help='config file path', default=my_config)
-    parser.add_argument('-e', '--epochs', type=int, default=40)
+    parser.add_argument('-e', '--epochs', type=int, default=1000)
     parser.add_argument('-b', '--batch', type=int, default=16)
-    parser.add_argument('-p', '--patience', type=int, default=5)
+    parser.add_argument('-p', '--early_stopping_patience', type=int, default=5)
     parser.add_argument('-w', '--workers', type=int, default=0)
-    parser.add_argument('--lr', type=float, default=5e-4, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate')
     parser.add_argument('--val_check_interval', type=int, default=800)
     
     parser.add_argument('-l', '--num_layers', type=int, default=8)
@@ -40,6 +40,10 @@ def get_arguments(my_config=None):
     parser.add_argument('--heads', type=int, default=8)
     parser.add_argument('--dim_key', type=int, default=32) 
     parser.add_argument('--rel_pos_length', type=int, default=3) 
+    
+    parser.add_argument('--reduce_lr_patience', type=int, default=None, help='Reduce LR patience')
+    parser.add_argument('--reduce_lr_factor', type=float, default=0.2, help='Reduce LR factor')
+    parser.add_argument('--min_lr_times', type=int, default=1, help='Reduce LR N times')
     
     parser.add_argument('--model_name', type=str, default='BasicGSA', help='Type')
     
@@ -163,15 +167,24 @@ def run(config):
     model = model.to(config.device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=1e-5)
-    loss_fn = WeightedMAELoss(ds.lat, config.device)
+    
+    lr_scheduler = None
+    if config.reduce_lr_patience:
+        min_lr = (config.reduce_lr_factor**config.min_lr_times) * config.lr
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=config.reduce_lr_factor, 
+                                                                  patience=config.reduce_lr_patience, min_lr=min_lr, verbose=True)
+        
+    loss_fn = WeightedMSELoss(ds.lat, config.device)
     evaluator = Evaluator(model, val_loader, loss_fn, config.device)
     
     util = Utils('./output', model_name)
   
     checkpoint_file_path = os.path.join(util.path, 'checkpoint.pth')
-    early_stopping = EarlyStopping(filename=checkpoint_file_path, patience=config.patience, no_stop=config.no_stop, verbose=config.verbose)
+    early_stopping = EarlyStopping(filename=checkpoint_file_path, patience=config.early_stopping_patience, 
+                                   no_stop=config.no_stop, verbose=config.verbose)
     
-    trainer = Trainer(model, train_loader, optimizer, loss_fn, early_stopping, evaluator, util, config.device, verbose=config.verbose)
+    trainer = Trainer(model, train_loader, optimizer, loss_fn, early_stopping, evaluator, lr_scheduler, 
+                      util, config.device, verbose=config.verbose)
     trainer.fit(epochs=config.epochs, val_check_interval=config.val_check_interval)
     
     checkpoint = Utils.load_checkpoint(experiment_id=util.experiment_id, root_folder='./output', model_name=model_name)
@@ -192,9 +205,14 @@ def run(config):
     
     preds = create_predictions(model, test_loader, device=config.device)
     
-    z500_valid = load_test_data(f'{config.data_dir}geopotential', 'z', years=slice(*config.test_years))
     
-    test_loss = compute_weighted_rmse(preds, z500_valid).load()
+    z500_valid = load_test_data(f'{config.data_dir}geopotential', 'z', years=slice(*config.test_years))
+    t850_valid = load_test_data(f'{config.data_dir}temperature', 't', years=slice(*config.test_years))
+    t2m = xr.open_mfdataset(f'{config.data_dir}/2m_temperature/*.nc', combine='by_coords').sel(time=slice(*config.test_years))
+    
+    valid = xr.merge([z500_valid, t850_valid, t2m])
+    
+    test_loss = compute_weighted_rmse(preds, valid).load()
         
     print(f'WeightedRMSELoss ({config.lead_time / 24} days): {test_loss}')
 
