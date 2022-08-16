@@ -71,14 +71,14 @@ class BasicResNet(nn.Module):
         
         self.res_block = nn.Sequential()
         
-        for f, k in zip(filters[1:-1], kernels[1:-1]):
-            self.res_block.add_module('res_block',
+        for i, (f, k) in enumerate(zip(filters[1:-1], kernels[1:-1])):
+            self.res_block.add_module(f'res_block_{i}',
                                       ResBlock(f, k, bn_position=bn_position, bias=bias, dropout=dropout, 
                                                skip=skip, activation=activation)
                                     )
             
         self.end_conv = ConvBlock(in_channels=filters[-2], filters=filters[-1], kernel=kernels[-1], bn_position=bn_position, 
-                                  bias=bias, dropout=dropout, activation=activation)
+                                  bias=bias, dropout=dropout, activation=activation).periodic_conv
         #output = Activation('linear', dtype='float32')(output)
     
     def forward(self, x):
