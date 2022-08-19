@@ -77,6 +77,7 @@ class WeatherBenchDataset(Dataset):
         else:
             self.mean = self.data.isel(time=slice(0, None, norm_subsample)).mean(
                 ('time', 'lat', 'lon')).compute()
+            self.mean.to_netcdf('mean_resnet.nc')
             if 'tp' in self.data.level_names:  # set tp mean to zero but not if ext
                 tp_idx = list(self.data.level_names).index('tp')
                 self.mean.values[tp_idx] = 0
@@ -86,6 +87,7 @@ class WeatherBenchDataset(Dataset):
         else:
             self.std = self.data.isel(time=slice(0, None, norm_subsample)).std(
                 ('time', 'lat', 'lon')).compute()
+            self.std.to_netcdf('std_resnet.nc')
 
         if tp_log is not None:
             self.mean.attrs['tp_log'] = tp_log

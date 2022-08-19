@@ -66,8 +66,8 @@ def get_arguments(my_config=None):
     
     #parser.add_argument('--time_dim', action='store_true')
     
-    parser.add_argument('--ext_mean', type=str, default='./mean.nc', help='External normalization mean')
-    parser.add_argument('--ext_std', type=str, default='./std.nc', help='External normalization std')
+    parser.add_argument('--ext_mean', type=str, default=None, help='External normalization mean')
+    parser.add_argument('--ext_std', type=str, default=None, help='External normalization std')
     parser.add_argument('--cont_time', type=int, default=0, help='Continuous time 0/1')
     parser.add_argument('--multi_dt', type=int, default=1, help='Differentiate through multiple time steps')
     parser.add_argument('--load_part_size', type=int, default=26280, help='if 0: load the entire train dataset to memory; else: load only the specified size') # default equivalent to 3 years
@@ -117,25 +117,30 @@ def run(config):
     val_data = ds.sel(time=slice(*config.valid_years))
     test_data = ds.sel(time=slice(*config.test_years))
     
-    ds_mean = xr.open_dataarray(config.ext_mean)
-    ds_std = xr.open_dataarray(config.ext_std)
+    ds_mean = None
+    if config.ext_mean is not None:
+        ds_mean = xr.open_dataarray(config.ext_mean)
+    
+    ds_std = None
+    if config.ext_std is not None:
+        ds_std = xr.open_dataarray(config.ext_std)
     
     # options specific to dataset generation
     time_dim = True if config.model_name not in ['BasicGSA', 'BasicResNet'] else False
     transpose_time_dim = True if config.model_name in ['ConvGSA'] else False
     
     ds_train = WeatherBenchDataset(train_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                   nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
-                                   mean=ds_mean, std=ds_std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
-                                   discard_first=config.discard_first, data_subsample=config.data_subsample,
-                                   norm_subsample=config.norm_subsample, tp_log = None, load=True, 
-                                   load_part_size=config.load_part_size, verbose=config.verbose)
+                                   nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, 
+                                   dt_in=config.dt_in, mean=ds_mean, std=ds_std, normalize=True, cont_time=True,
+                                   multi_dt=config.multi_dt, discard_first=config.discard_first,
+                                   data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
+                                   tp_log = None, load=True, load_part_size=config.load_part_size, verbose=config.verbose)
 
     ds_val = WeatherBenchDataset(val_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                 nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
-                                 mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt,
-                                 data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
-                                 tp_log=None, load=True, verbose=config.verbose)
+                                 nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,
+                                 dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True,
+                                 multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
+                                 norm_subsample=config.norm_subsample, tp_log=None, load=True, verbose=config.verbose)
     
     params = {'batch_size': config.batch, 
               'num_workers': config.workers, 
@@ -196,10 +201,10 @@ def run(config):
     del(val_loader)
     
     ds_test = WeatherBenchDataset(test_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
-                                  nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, dt_in=config.dt_in,
-                                  mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True, multi_dt=config.multi_dt, 
-                                  data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
-                                  tp_log=None, load=True, verbose=config.verbose)
+                                  nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,
+                                  dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True,
+                                  multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
+                                  norm_subsample=config.norm_subsample, tp_log=None, load=True, verbose=config.verbose)
     
     test_loader = DataLoader(dataset=ds_test, shuffle=False, **params)
     

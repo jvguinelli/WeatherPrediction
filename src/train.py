@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import torch
 
 class Trainer:
@@ -47,11 +48,18 @@ class Trainer:
     def __train(self, epoch, val_check_interval=None):
         self.model.train()
         epoch_loss, cumulative_loss = 0.0, 0.0
-        for batch_i, (inputs, target) in enumerate(self.train_loader, 1):
+        
+        total_iter = len(self.train_loader)
+        
+        pbar = tqdm(enumerate(self.train_loader, 1), total=total_iter)
+        
+        for batch_i, (inputs, target) in pbar:
             inputs, target = inputs.to(self.device), target.to(self.device)
             output = self.model(inputs)
 
             loss = self.loss_fn(output, target)
+            pbar.set_postfix({'loss': loss.item()})
+            
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -77,7 +85,7 @@ class Trainer:
                         break
                     cumulative_loss = 0.0
 
-        return epoch_loss/len(self.train_loader)
+        return epoch_loss/total_iter
     
 
 class EarlyStopping:

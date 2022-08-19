@@ -1,5 +1,9 @@
 model_name: 'BasicResNet'
-data_dir: /home/jguinelli/mestrado/era5/dataset/5.625deg/
+data_dir: /data/guinelli/WeatherBenchData/5.625deg/
+
+#ext_mean: './mean.nc'
+#ext_std: './std.nc'
+
 in_vars: {'geopotential': ('z', [50, 250, 500, 600, 700, 850, 925]), 'temperature': ('t', [50, 250, 500, 600, 700, 850, 925]), 'u_component_of_wind': ('u', [50, 250, 500, 600, 700, 850, 925]), 'v_component_of_wind': ('v', [50, 250, 500, 600, 700, 850, 925]), 'specific_humidity': ('q', [50, 250, 500, 600, 700, 850, 925]), 'toa_incident_solar_radiation': ('tisr', None), '2m_temperature': ('t2m', None), 'constants': ['lsm','orography','lat2d']}
 out_vars: [z_500, t_850, t2m]
 filters: [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 3]
@@ -11,6 +15,7 @@ no_stop: false
 reduce_lr_patience: 2
 min_lr_times: 2
 
+norm_subsample: 30000
 lr: 5e-5
 bn_position: post
 dropout: 0.1
