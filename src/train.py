@@ -51,39 +51,45 @@ class Trainer:
         
         total_iter = len(self.train_loader)
         
-        pbar = tqdm(enumerate(self.train_loader, 1), total=total_iter)
+        scaler = torch.cuda.amp.GradScaler()
         
-        for batch_i, (inputs, target) in pbar:
-            inputs, target = inputs.to(self.device), target.to(self.device)
-            output = self.model(inputs)
-
-            loss = self.loss_fn(output, target)
-            pbar.set_postfix({'loss': loss.item()})
+        with tqdm(enumerate(self.train_loader, 1), total=total_iter) as pbar:
+            for batch_i, (inputs, target) in pbar:
+                inputs, target = inputs.to(self.device), target.to(self.device)
+                self.optimizer.zero_grad()
+                
+                # NEW
+                with torch.cuda.amp.autocast():
+                    output = self.model(inputs)
+                    loss = self.loss_fn(output, target)
+                
+                pbar.set_postfix({'loss': loss.item()})
+                
+                scaler.scale(loss).backward()
+                scaler.step(self.optimizer)
+                scaler.update()
+                
+                epoch_loss += loss.item()
+                cumulative_loss += loss.item()
             
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-            epoch_loss += loss.item()
-            cumulative_loss += loss.item()
-            
-            if val_check_interval:
-                if (batch_i % val_check_interval) == 0:
-                    cumulative_loss = cumulative_loss / val_check_interval
-                    val_loss = self.evaluator.evaluate()
+                if val_check_interval:
+                    if (batch_i % val_check_interval) == 0:
+                        cumulative_loss = cumulative_loss / val_check_interval
+                        val_loss = self.evaluator.evaluate()
                     
-                    self.util.save_losses(epoch - 1, cumulative_loss, val_loss)
+                        self.util.save_losses(epoch - 1, cumulative_loss, val_loss)
                     
-                    if self.verbose:
-                        print(f'train_loss: {cumulative_loss:.4f} - val_loss: {val_loss:.4f} - loss: {loss:.4f}')
+                        if self.verbose:
+                            print(f'train_loss: {cumulative_loss:.4f} - val_loss: {val_loss:.4f} - loss: {loss:.4f}')
                     
-                    self.early_stopping(val_loss, self.model, self.optimizer, epoch)
-                    self.model.train()
+                        self.early_stopping(val_loss, self.model, self.optimizer, epoch)
+                        self.model.train()
                     
-                    if self.early_stopping.isToStop:
-                        if (self.verbose):
-                            print("=> Stopped")
-                        break
-                    cumulative_loss = 0.0
+                        if self.early_stopping.isToStop:
+                            if (self.verbose):
+                                print("=> Stopped")
+                            break
+                        cumulative_loss = 0.0
 
         return epoch_loss/total_iter
     
