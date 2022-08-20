@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torchsummary import summary
 
 from src.dataset import WeatherBenchDataset
 from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA, ConvLSTMAxial
@@ -131,14 +132,14 @@ def run(config):
     
     ds_train = WeatherBenchDataset(train_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
                                    nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim, 
-                                   dt_in=config.dt_in, mean=ds_mean, std=ds_std, normalize=True, cont_time=True,
+                                   dt_in=config.dt_in, mean=ds_mean, std=ds_std, normalize=True, cont_time=config.cont_time,
                                    multi_dt=config.multi_dt, discard_first=config.discard_first,
                                    data_subsample=config.data_subsample, norm_subsample=config.norm_subsample, 
                                    tp_log = None, load=True, load_part_size=config.load_part_size, verbose=config.verbose)
 
     ds_val = WeatherBenchDataset(val_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
                                  nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,
-                                 dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True,
+                                 dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=config.cont_time,
                                  multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
                                  norm_subsample=config.norm_subsample, tp_log=None, load=True, verbose=config.verbose)
     
@@ -171,6 +172,8 @@ def run(config):
     model_name = model.__class__.__name__
     model = model.to(config.device)
     
+    summary(model, ds_train[0][0].shape)
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=1e-5)
     
     lr_scheduler = None
@@ -202,8 +205,8 @@ def run(config):
     
     ds_test = WeatherBenchDataset(test_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
                                   nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,
-                                  dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=True,
-                                  multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
+                                  dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, 
+                                  cont_time=config.cont_time, multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
                                   norm_subsample=config.norm_subsample, tp_log=None, load=True, verbose=config.verbose)
     
     test_loader = DataLoader(dataset=ds_test, shuffle=False, **params)

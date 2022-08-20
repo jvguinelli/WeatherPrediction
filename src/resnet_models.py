@@ -17,19 +17,18 @@ class ConvBlock(nn.Module):
                       padding=(0, padding), padding_mode='circular', bias=bias),
         )
         
-        self.bn = nn.BatchNorm2d(filters)
         self.activation = nn.LeakyReLU()
-        
+        self.bn = nn.BatchNorm2d(filters)
         self.dropout_layer = nn.Dropout(self.dropout)
         
     def forward(self, x):
         if self.bn_position == 'pre': 
             x = self.bn(x)
         x = self.periodic_conv(x)
-        if self.bn_position == 'mid': 
+        if self.bn_position == 'mid':  
             x = self.bn(x)
         x = self.activation(x)
-        if self.bn_position == 'post': 
+        if self.bn_position == 'post':  
             x = self.bn(x)
         
         if self.dropout > 0: 
