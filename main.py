@@ -71,7 +71,7 @@ def get_arguments(my_config=None):
     parser.add_argument('--ext_std', type=str, default=None, help='External normalization std')
     parser.add_argument('--cont_time', type=int, default=0, help='Continuous time 0/1')
     parser.add_argument('--multi_dt', type=int, default=1, help='Differentiate through multiple time steps')
-    parser.add_argument('--load_part_size', type=int, default=26280, help='if 0: load the entire train dataset to memory; else: load only the specified size') # default equivalent to 3 years
+    parser.add_argument('--load_part_size', type=int, default=0, help='if 0: load the entire train dataset to memory; else: load only the specified size') # default equivalent to 3 years
     
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--no_stop', action='store_true', dest='no_stop')
@@ -139,8 +139,8 @@ def run(config):
 
     ds_val = WeatherBenchDataset(val_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
                                  nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,
-                                 dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True, cont_time=config.cont_time,
-                                 multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
+                                 dt_in=config.dt_in, mean=ds_train.mean, std=ds_train.std, normalize=True,
+                                 cont_time=config.cont_time, multi_dt=config.multi_dt, data_subsample=config.data_subsample, 
                                  norm_subsample=config.norm_subsample, tp_log=None, load=True, verbose=config.verbose)
     
     params = {'batch_size': config.batch, 
@@ -166,11 +166,18 @@ def run(config):
         model = model(in_channels=in_channels, filters=config.filters, kernels=config.kernels, bn_position=config.bn_position, 
                       skip=True, bias=True, dropout=config.dropout, activation=nn.LeakyReLU)
     else:
-        model = model(in_channels=in_channels, hidden_dim=config.hidden_dim, out_channels=out_channels, num_layers=config.num_layers,
-                      heads=config.heads, dim_key=config.dim_key, rel_pos_length=config.rel_pos_length)
+        model = model(in_channels=in_channels, hidden_dim=config.hidden_dim, out_channels=out_channels,
+                      num_layers=config.num_layers, heads=config.heads, dim_key=config.dim_key,
+                      rel_pos_length=config.rel_pos_length)
         
     model_name = model.__class__.__name__
     model = model.to(config.device)
+    
+    print("### MEAN ###")
+    print(ds_train.mean)
+    
+    print("### STD ###")
+    print(ds_train.std)
     
     summary(model, ds_train[0][0].shape)
     
@@ -180,7 +187,8 @@ def run(config):
     if config.reduce_lr_patience:
         min_lr = (config.reduce_lr_factor**config.min_lr_times) * config.lr
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=config.reduce_lr_factor, 
-                                                                  patience=config.reduce_lr_patience, min_lr=min_lr, verbose=True)
+                                                                  patience=config.reduce_lr_patience, min_lr=min_lr,
+                                                                  verbose=True)
         
     loss_fn = WeightedMSELoss(ds.lat, config.device)
     evaluator = Evaluator(model, val_loader, loss_fn, config.device)
@@ -193,6 +201,7 @@ def run(config):
     
     trainer = Trainer(model, train_loader, optimizer, loss_fn, early_stopping, evaluator, lr_scheduler, 
                       util, config.device, verbose=config.verbose)
+    
     trainer.fit(epochs=config.epochs, val_check_interval=config.val_check_interval)
     
     checkpoint = Utils.load_checkpoint(experiment_id=util.experiment_id, root_folder='./output', model_name=model_name)
@@ -202,6 +211,13 @@ def run(config):
     del(ds_val)
     del(train_loader)
     del(val_loader)
+    
+    print("### MEAN ###")
+    print(ds_train.mean)
+    
+    print("### STD ###")
+    print(ds_train.std)
+    
     
     ds_test = WeatherBenchDataset(test_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
                                   nt_in=config.nt_in, time_dim=time_dim, transpose_time_dim=transpose_time_dim,

@@ -20,7 +20,7 @@ class ConvBlock(nn.Module):
         self.activation = nn.LeakyReLU()
         self.bn = nn.BatchNorm2d(filters)
         self.dropout_layer = nn.Dropout(self.dropout)
-        
+                
     def forward(self, x):
         if self.bn_position == 'pre': 
             x = self.bn(x)
@@ -79,6 +79,14 @@ class BasicResNet(nn.Module):
         self.end_conv = ConvBlock(in_channels=filters[-2], filters=filters[-1], kernel=kernels[-1], bn_position=bn_position, 
                                   bias=bias, dropout=dropout, activation=activation).periodic_conv
         #output = Activation('linear', dtype='float32')(output)
+        
+        self.apply(self._init_weights)
+        
+    def _init_weights(self, module):
+        if isinstance(module, nn.Conv2d):
+            nn.init.xavier_uniform_(module.weight.data)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias.data)
     
     def forward(self, x):
         x = self.init_conv(x)
