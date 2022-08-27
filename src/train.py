@@ -59,15 +59,29 @@ class Trainer:
                 self.optimizer.zero_grad()
                 
                 # NEW
-                with torch.cuda.amp.autocast():
-                    output = self.model(inputs)
-                    loss = self.loss_fn(output, target)
+                #with torch.cuda.amp.autocast():
+                #    output = self.model(inputs)
+                #    loss = self.loss_fn(output, target)
+                
+                #pbar.set_postfix({'loss': loss.item()})
+                
+                #scaler.scale(loss).backward()
+                #scaler.step(self.optimizer)
+                #scaler.update()
+                
+                # END NEW
+                
+                # OLD
+                
+                output = self.model(inputs)
+                loss = self.loss_fn(output, target)
                 
                 pbar.set_postfix({'loss': loss.item()})
                 
-                scaler.scale(loss).backward()
-                scaler.step(self.optimizer)
-                scaler.update()
+                loss.backward()
+                self.optimizer.step()
+                
+                # END OLD
                 
                 epoch_loss += loss.item()
                 cumulative_loss += loss.item()

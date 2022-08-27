@@ -16,7 +16,7 @@ from torchsummary import summary
 
 from src.dataset import WeatherBenchDataset
 from src.attention_models import BasicGSA, ConvGSA, ConvLSTMGSA, ConvLSTMAxial
-from src.resnet_models import BasicResNet
+from src.resnet_models import BasicResNet, SphericResNet
 from src.loss import WeightedMAELoss, WeightedMSELoss, WeightedRMSELoss
 from src.train import Trainer, EarlyStopping
 from src.evaluate import Evaluator
@@ -99,7 +99,8 @@ def get_model(model_name):
         'ConvGSA': ConvGSA,
         'ConvLSTMGSA': ConvLSTMGSA,
         'ConvLSTMAxial': ConvLSTMAxial,
-        'BasicResNet': BasicResNet
+        'BasicResNet': BasicResNet,
+        'SphericResNet': SphericResNet
     }
     return models[model_name]
 
@@ -127,7 +128,7 @@ def run(config):
         ds_std = xr.open_dataarray(config.ext_std)
     
     # options specific to dataset generation
-    time_dim = True if config.model_name not in ['BasicGSA', 'BasicResNet'] else False
+    time_dim = True if config.model_name not in ['BasicGSA', 'BasicResNet', 'SphericResNet'] else False
     transpose_time_dim = True if config.model_name in ['ConvGSA'] else False
     
     ds_train = WeatherBenchDataset(train_data, config.in_vars, lead_time=config.lead_time, output_vars=config.out_vars, 
@@ -162,7 +163,7 @@ def run(config):
     
     model = get_model(config.model_name)
     
-    if config.model_name == 'BasicResNet':
+    if config.model_name in ['BasicResNet', 'SphericResNet']:
         model = model(in_channels=in_channels, filters=config.filters, kernels=config.kernels, bn_position=config.bn_position, 
                       skip=True, bias=True, dropout=config.dropout, activation=nn.LeakyReLU)
     else:
