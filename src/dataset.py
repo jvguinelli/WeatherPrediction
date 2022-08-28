@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 class WeatherBenchDataset(Dataset):
     
     def __init__(self, dataset, var_dict, lead_time, output_vars, nt_in=3, dt_in=6, time_dim=True, transpose_time_dim=False,
-                 mean=None, std=None, normalize=True, cont_time=True, fixed_time=True, multi_dt=1, discard_first=None,
+                 mean=None, std=None, normalize=True, cont_time=True, fixed_time=False, multi_dt=1, discard_first=None,
                  data_subsample=1, norm_subsample=1, tp_log=None, load=True, load_part_size=0, verbose=1):
         '''
         - nt_in: number of input time steps
@@ -43,6 +43,8 @@ class WeatherBenchDataset(Dataset):
             else:
                 var, levels = params
                 da = dataset[var]
+                if tp_log and var == 'tp':
+                    da = np.log(da + tp_log) - np.log(tp_log)
                 try:
                     data.append(da.sel(level=levels))
                     level_names += [f'{var}_{level}' for level in levels]
@@ -77,7 +79,6 @@ class WeatherBenchDataset(Dataset):
         else:
             self.mean = self.data.isel(time=slice(0, None, norm_subsample)).mean(
                 ('time', 'lat', 'lon')).compute()
-            self.mean.to_netcdf('mean_resnet.nc')
             if 'tp' in self.data.level_names:  # set tp mean to zero but not if ext
                 tp_idx = list(self.data.level_names).index('tp')
                 self.mean.values[tp_idx] = 0
@@ -87,11 +88,14 @@ class WeatherBenchDataset(Dataset):
         else:
             self.std = self.data.isel(time=slice(0, None, norm_subsample)).std(
                 ('time', 'lat', 'lon')).compute()
-            self.std.to_netcdf('std_resnet.nc')
 
         if tp_log is not None:
             self.mean.attrs['tp_log'] = tp_log
             self.std.attrs['tp_log'] = tp_log
+                
+        self.mean.to_netcdf('mean_resnet.nc')
+        self.std.to_netcdf('std_resnet.nc')
+            
         if normalize:
             self.data = (self.data - self.mean) / self.std
         
@@ -164,7 +168,7 @@ class WeatherBenchDataset(Dataset):
 
         X = X_data.isel(time=index).values.astype('float32')
         
-        # seria quando considera mais de um time step como entrada ou como predicao?? como predicao
+        # seria quando considera mais de um time step como entrada ou como predicao?? R: como predicao!!!
         if self.multi_dt > 1: consts = X[..., self.const_idxs]
 
         if self.nt_in > 1:
